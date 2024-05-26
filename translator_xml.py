@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from deep_translator import GoogleTranslator
 from lxml import etree as ET
 import codecs
@@ -84,9 +84,14 @@ def validate_xml_structure(root):
         messagebox.showerror("Error", f"El valor de 'language' no es válido: {language}.")
         return False
     
-    if translatedname != VALID_LANGUAGES[language]:
-        messagebox.showerror("Error", f"El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.")
-        return False
+    correct_translatedname = VALID_LANGUAGES[language]
+    if translatedname != correct_translatedname:
+        response = messagebox.askyesno("Error", f"El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.\n¿Quieres cambiarlo a '{correct_translatedname}'?")
+        if response:
+            root.attrib['translatedname'] = correct_translatedname
+            messagebox.showinfo("Info", f"El valor de 'translatedname' ha sido cambiado a '{correct_translatedname}'.")
+        else:
+            return False
     
     return True
 
