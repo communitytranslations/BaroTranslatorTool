@@ -7,6 +7,7 @@ import codecs
 parser = ET.XMLParser(remove_blank_text=True)
 tree = None
 root = None
+translations = {}
 
 VALID_LANGUAGES = {
     "Brazilian Portuguese": "Português brasileiro",
@@ -24,6 +25,20 @@ VALID_LANGUAGES = {
     "Turkish": "Türkçe"
 }
 
+def load_translations():
+    global translations
+    try:
+        tree = ET.parse('translations.xml')
+        root = tree.getroot()
+        for text in root.findall('text'):
+            translations[text.get('id')] = text.text
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load translations: {e}")
+
+def _(text_id, **kwargs):
+    text = translations.get(text_id, text_id)
+    return text.format(**kwargs)
+
 def load_xml():
     global tree, root
     file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")])
@@ -34,17 +49,16 @@ def load_xml():
             tree = ET.XML(content, parser)
             root = tree
 
-            # Validar estructura del XML
             if not validate_xml_structure(root):
                 return
             
-            messagebox.showinfo("Success", "Archivo XML cargado correctamente.")
+            messagebox.showinfo(_("success_load"))
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar el archivo XML: {e}")
+            messagebox.showerror(_("error_load", error=e))
 
 def save_xml():
     if tree is None:
-        messagebox.showerror("Error", "No hay archivo XML cargado para guardar.")
+        messagebox.showerror(_("error_no_file"))
         return
 
     file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml")])
@@ -53,13 +67,13 @@ def save_xml():
             with open(file_path, 'wb') as f:
                 f.write(codecs.BOM_UTF8)
                 ET.ElementTree(tree).write(f, encoding='utf-8', xml_declaration=True, pretty_print=True)
-            messagebox.showinfo("Success", "Archivo XML guardado correctamente.")
+            messagebox.showinfo(_("success_save"))
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo guardar el archivo XML: {e}")
+            messagebox.showerror(_("error_save", error=e))
 
 def translate_text():
     if root is None:
-        messagebox.showerror("Error", "Primero carga un archivo XML.")
+        messagebox.showerror(_("error_no_file_translate"))
         return
 
     translator = GoogleTranslator(source='en', target='es')
@@ -68,47 +82,49 @@ def translate_text():
             if isinstance(elem, ET._Element) and elem.text and elem.text.strip():
                 translated_text = translator.translate(elem.text)
                 elem.text = translated_text
-        messagebox.showinfo("Success", "Traducción completada.")
+        messagebox.showinfo(_("success_translate"))
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo completar la traducción: {e}")
+        messagebox.showerror(_("error_translate", error=e))
 
 def validate_xml_structure(root):
     if root.tag != "infotexts":
-        messagebox.showerror("Error", "El archivo XML debe comenzar con la etiqueta <infotexts>.")
+        messagebox.showerror(_("error_invalid_structure"))
         return False
 
     language = root.attrib.get("language")
     translatedname = root.attrib.get("translatedname")
     
     if language not in VALID_LANGUAGES:
-        messagebox.showerror("Error", f"El valor de 'language' no es válido: {language}.")
+        messagebox.showerror(_("error_invalid_language", language=language))
         return False
     
     correct_translatedname = VALID_LANGUAGES[language]
     if translatedname != correct_translatedname:
-        response = messagebox.askyesno("Error", f"El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.\n¿Quieres cambiarlo a '{correct_translatedname}'?")
+        response = messagebox.askyesno(_("error_invalid_translatedname", language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
         if response:
             root.attrib['translatedname'] = correct_translatedname
-            messagebox.showinfo("Info", f"El valor de 'translatedname' ha sido cambiado a '{correct_translatedname}'.")
+            messagebox.showinfo(_("info_translatedname_changed", correct_translatedname=correct_translatedname))
         else:
             return False
     
     return True
 
 app = tk.Tk()
-app.title("Traductor XML")
+app.title(_("title"))
 app.geometry("400x200")
+
+load_translations()
 
 frame = tk.Frame(app)
 frame.pack(pady=20)
 
-load_button = tk.Button(frame, text="Cargar XML", command=load_xml)
+load_button = tk.Button(frame, text=_("load_button"), command=load_xml)
 load_button.grid(row=0, column=0, padx=10)
 
-translate_button = tk.Button(frame, text="Traducir", command=translate_text)
+translate_button = tk.Button(frame, text=_("translate_button"), command=translate_text)
 translate_button.grid(row=0, column=1, padx=10)
 
-save_button = tk.Button(frame, text="Guardar XML", command=save_xml)
+save_button = tk.Button(frame, text=_("save_button"), command=save_xml)
 save_button.grid(row=0, column=2, padx=10)
 
 app.mainloop()
