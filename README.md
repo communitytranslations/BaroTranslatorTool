@@ -27,9 +27,10 @@ Install python
 
 Install pip packages 
 
-- tkinter 
-- googletrans
-- deep-translator
+- pip installtkinter 
+- pip installgoogletrans
+- pip installdeep-translator
+- pip install lxml
 
 ## Step 2: run python
 

@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from deep_translator import GoogleTranslator
-import xml.etree.ElementTree as ET
+from lxml import etree as ET
 
+parser = ET.XMLParser(remove_blank_text=True)
 tree = None
 root = None
 
@@ -11,7 +12,7 @@ def load_xml():
     file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")])
     if file_path:
         try:
-            tree = ET.parse(file_path)
+            tree = ET.parse(file_path, parser)
             root = tree.getroot()
             messagebox.showinfo("Success", "Archivo XML cargado correctamente.")
         except Exception as e:
@@ -25,7 +26,8 @@ def save_xml():
     file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml")])
     if file_path:
         try:
-            tree.write(file_path, encoding='utf-8', xml_declaration=True)
+            with open(file_path, 'wb') as f:
+                tree.write(f, encoding='utf-8', xml_declaration=True, pretty_print=True)
             messagebox.showinfo("Success", "Archivo XML guardado correctamente.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el archivo XML: {e}")
@@ -39,7 +41,7 @@ def translate_text():
     translator = GoogleTranslator(source='en', target='es')
     try:
         for elem in root.iter():
-            if elem.text and elem.text.strip():
+            if isinstance(elem, ET._Element) and elem.text and elem.text.strip():
                 translated_text = translator.translate(elem.text)
                 elem.text = translated_text
         messagebox.showinfo("Success", "Traducción completada.")
