@@ -14,8 +14,8 @@
     <text id="error_translate">No se pudo completar la traducción: {error}</text>
     <text id="error_invalid_structure">El archivo XML debe comenzar con la etiqueta &lt;infotexts&gt;.</text>
     <text id="error_invalid_language">El valor de 'language' no es válido: {language}.</text>
-    <text id="error_invalid_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.</text>
-    <text id="change_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.\n¿Quieres cambiarlo a '{correct_translatedname}'?</text>
+    <text id="error_invalid_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}' Pone: {translatedname}.</text>
+    <text id="change_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}'. Pone:  {translatedname}.\n¿Quieres cambiarlo a '{correct_translatedname}'?</text>
     <text id="info_translatedname_changed">El valor de 'translatedname' ha sido cambiado a '{correct_translatedname}'.</text>
     <text id="output_language_label">Idioma de salida:</text>
 </translations>
