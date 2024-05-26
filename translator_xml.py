@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 from deep_translator import GoogleTranslator
 from lxml import etree as ET
 import codecs
@@ -53,7 +53,11 @@ def load_translations():
 
 def _(text_id, **kwargs):
     text = translations.get(text_id, text_id)
-    return text.format(**kwargs)
+    try:
+        return text.format(**kwargs)
+    except KeyError as e:
+        print(f"Missing key in translations: {e}")
+        return text
 
 def load_xml():
     global tree, root
@@ -70,7 +74,7 @@ def load_xml():
             
             messagebox.showinfo(_("success_load"))
         except Exception as e:
-            messagebox.showerror(_("error_load", error=e))
+            messagebox.showerror(_("error_load"), _(error=e))
 
 def save_xml():
     if tree is None:
@@ -85,7 +89,7 @@ def save_xml():
                 ET.ElementTree(tree).write(f, encoding='utf-8', xml_declaration=True, pretty_print=True)
             messagebox.showinfo(_("success_save"))
         except Exception as e:
-            messagebox.showerror(_("error_save", error=e))
+            messagebox.showerror(_("error_save"), _(error=e))
 
 def translate_text():
     if root is None:
@@ -108,7 +112,7 @@ def translate_text():
                 elem.text = translated_text
         messagebox.showinfo(_("success_translate"))
     except Exception as e:
-        messagebox.showerror(_("error_translate", error=e))
+        messagebox.showerror(_("error_translate"), _(error=e))
 
 def validate_xml_structure(root):
     if root.tag != "infotexts":
@@ -124,7 +128,8 @@ def validate_xml_structure(root):
     
     correct_translatedname = VALID_LANGUAGES[language]
     if translatedname != correct_translatedname:
-        response = messagebox.askyesno(_("change_translatedname", language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
+        response = messagebox.askyesno(_("error_invalid_translatedname"), 
+                                       _("change_translatedname", language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
         if response:
             root.attrib['translatedname'] = correct_translatedname
             messagebox.showinfo(_("info_translatedname_changed", correct_translatedname=correct_translatedname))
@@ -154,7 +159,7 @@ save_button.grid(row=0, column=2, padx=10)
 output_language_var = tk.StringVar(app)
 output_language_var.set("Castilian Spanish")  # Valor por defecto
 
-output_language_label = tk.Label(frame, text="Idioma de salida:")
+output_language_label = tk.Label(frame, text=_("output_language_label"))
 output_language_label.grid(row=1, column=0, padx=10, pady=10)
 
 output_language_menu = ttk.Combobox(frame, textvariable=output_language_var, values=list(GOOGLE_TRANSLATE_LANGUAGES.keys()))
