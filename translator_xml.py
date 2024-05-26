@@ -81,6 +81,10 @@ def save_xml():
         messagebox.showerror(title=_("title"), message=_("error_no_file"))
         return
 
+    output_language = output_language_var.get()
+    root.attrib['language'] = output_language
+    root.attrib['translatedname'] = VALID_LANGUAGES[output_language]
+
     file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml")])
     if file_path:
         try:
