@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from deep_translator import GoogleTranslator
 from lxml import etree as ET
 import codecs
@@ -23,6 +23,22 @@ VALID_LANGUAGES = {
     "Simplified Chinese": "中文(简体)",
     "Traditional Chinese": "中文(繁體)",
     "Turkish": "Türkçe"
+}
+
+GOOGLE_TRANSLATE_LANGUAGES = {
+    "Brazilian Portuguese": "pt",
+    "Castilian Spanish": "es",
+    "English": "en",
+    "French": "fr",
+    "German": "de",
+    "Japanese": "ja",
+    "Korean": "ko",
+    "Latinamerican Spanish": "es",
+    "Polish": "pl",
+    "Russian": "ru",
+    "Simplified Chinese": "zh-CN",
+    "Traditional Chinese": "zh-TW",
+    "Turkish": "tr"
 }
 
 def load_translations():
@@ -76,7 +92,15 @@ def translate_text():
         messagebox.showerror(_("error_no_file_translate"))
         return
 
-    translator = GoogleTranslator(source='en', target='es')
+    language = root.attrib.get("language")
+    if language not in GOOGLE_TRANSLATE_LANGUAGES:
+        messagebox.showerror(_("error_invalid_language", language=language))
+        return
+
+    source_lang = GOOGLE_TRANSLATE_LANGUAGES[language]
+    target_lang = GOOGLE_TRANSLATE_LANGUAGES.get(output_language_var.get(), 'es')
+
+    translator = GoogleTranslator(source=source_lang, target=target_lang)
     try:
         for elem in root.iter():
             if isinstance(elem, ET._Element) and elem.text and elem.text.strip():
@@ -100,7 +124,7 @@ def validate_xml_structure(root):
     
     correct_translatedname = VALID_LANGUAGES[language]
     if translatedname != correct_translatedname:
-        response = messagebox.askyesno(_("error_invalid_translatedname", language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
+        response = messagebox.askyesno(_("change_translatedname", language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
         if response:
             root.attrib['translatedname'] = correct_translatedname
             messagebox.showinfo(_("info_translatedname_changed", correct_translatedname=correct_translatedname))
@@ -110,10 +134,9 @@ def validate_xml_structure(root):
     return True
 
 app = tk.Tk()
+load_translations()
 app.title(_("title"))
 app.geometry("400x200")
-
-load_translations()
 
 frame = tk.Frame(app)
 frame.pack(pady=20)
@@ -126,5 +149,15 @@ translate_button.grid(row=0, column=1, padx=10)
 
 save_button = tk.Button(frame, text=_("save_button"), command=save_xml)
 save_button.grid(row=0, column=2, padx=10)
+
+# Selección de idioma de salida
+output_language_var = tk.StringVar(app)
+output_language_var.set("Castilian Spanish")  # Valor por defecto
+
+output_language_label = tk.Label(frame, text="Idioma de salida:")
+output_language_label.grid(row=1, column=0, padx=10, pady=10)
+
+output_language_menu = ttk.Combobox(frame, textvariable=output_language_var, values=list(GOOGLE_TRANSLATE_LANGUAGES.keys()))
+output_language_menu.grid(row=1, column=1, padx=10, pady=10)
 
 app.mainloop()
