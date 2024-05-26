@@ -72,13 +72,13 @@ def load_xml():
             if not validate_xml_structure(root):
                 return
             
-            messagebox.showinfo(_("success_load"))
+            messagebox.showinfo(title=_("title"), message=_("success_load"))
         except Exception as e:
-            messagebox.showerror(_("error_load"), _(error=e))
+            messagebox.showerror(title=_("title"), message=_("error_load").format(error=e))
 
 def save_xml():
     if tree is None:
-        messagebox.showerror(_("error_no_file"))
+        messagebox.showerror(title=_("title"), message=_("error_no_file"))
         return
 
     file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml")])
@@ -87,18 +87,18 @@ def save_xml():
             with open(file_path, 'wb') as f:
                 f.write(codecs.BOM_UTF8)
                 ET.ElementTree(tree).write(f, encoding='utf-8', xml_declaration=True, pretty_print=True)
-            messagebox.showinfo(_("success_save"))
+            messagebox.showinfo(title=_("title"), message=_("success_save"))
         except Exception as e:
-            messagebox.showerror(_("error_save"), _(error=e))
+            messagebox.showerror(title=_("title"), message=_("error_save").format(error=e))
 
 def translate_text():
     if root is None:
-        messagebox.showerror(_("error_no_file_translate"))
+        messagebox.showerror(title=_("title"), message=_("error_no_file_translate"))
         return
 
     language = root.attrib.get("language")
     if language not in GOOGLE_TRANSLATE_LANGUAGES:
-        messagebox.showerror(_("error_invalid_language", language=language))
+        messagebox.showerror(title=_("title"), message=_("error_invalid_language").format(language=language))
         return
 
     source_lang = GOOGLE_TRANSLATE_LANGUAGES[language]
@@ -110,29 +110,29 @@ def translate_text():
             if isinstance(elem, ET._Element) and elem.text and elem.text.strip():
                 translated_text = translator.translate(elem.text)
                 elem.text = translated_text
-        messagebox.showinfo(_("success_translate"))
+        messagebox.showinfo(title=_("title"), message=_("success_translate"))
     except Exception as e:
-        messagebox.showerror(_("error_translate"), _(error=e))
+        messagebox.showerror(title=_("title"), message=_("error_translate").format(error=e))
 
 def validate_xml_structure(root):
     if root.tag != "infotexts":
-        messagebox.showerror(_("error_invalid_structure"))
+        messagebox.showerror(title=_("title"), message=_("error_invalid_structure"))
         return False
 
     language = root.attrib.get("language")
     translatedname = root.attrib.get("translatedname")
     
     if language not in VALID_LANGUAGES:
-        messagebox.showerror(_("error_invalid_language", language=language))
+        messagebox.showerror(title=_("title"), message=_("error_invalid_language").format(language=language))
         return False
     
     correct_translatedname = VALID_LANGUAGES[language]
     if translatedname != correct_translatedname:
-        response = messagebox.askyesno(_("error_invalid_translatedname"), 
-                                       _("change_translatedname", language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
+        response = messagebox.askyesno(title=_("title"), 
+                                       message=_("change_translatedname").format(language=language, translatedname=translatedname, correct_translatedname=correct_translatedname))
         if response:
             root.attrib['translatedname'] = correct_translatedname
-            messagebox.showinfo(_("info_translatedname_changed", correct_translatedname=correct_translatedname))
+            messagebox.showinfo(title=_("title"), message=_("info_translatedname_changed").format(correct_translatedname=correct_translatedname))
         else:
             return False
     
