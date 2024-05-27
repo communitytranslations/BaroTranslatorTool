@@ -114,7 +114,6 @@ class XMLProjectManager:
         conn.close()
 
     def cargar_xml(self, archivo_xml):
-        global db_modified
         parser_with_comments = ET.XMLParser(remove_blank_text=False, strip_cdata=False, ns_clean=False, recover=True, encoding='utf-8')
         tree = ET.parse(archivo_xml, parser=parser_with_comments)
         root = tree.getroot()
@@ -133,12 +132,10 @@ class XMLProjectManager:
                     # Actualizar si el texto ha cambiado
                     if result[1] != elem.text:
                         cursor.execute("UPDATE Etiquetas SET texto=? WHERE id=?", (elem.text, result[0]))
-                        db_modified = True
                 else:
                     cursor.execute("""
                     INSERT INTO Etiquetas (proyecto_id, etiqueta_principal, variable, texto)
                     VALUES (?, ?, ?, ?)""", (self.proyecto_id, etiqueta_principal, variable, elem.text))
-                    db_modified = True
         
         conn.commit()
         conn.close()
@@ -205,7 +202,7 @@ def save_xml():
         messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_no_file"))
         return
 
-    if not root:
+    if root is None:
         messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_save").format(error="No XML file loaded."))
         return
 
@@ -228,8 +225,7 @@ def save_xml():
                         new_elem.text = texto
 
             with open(file_path, 'wb') as f:
-                f.write(ET.tostring(root, encoding='utf-8', xml_declaration=True))
-            
+                f.write(ET.tostring(root, encoding='utf-8', xml_declaration=True, pretty_print=True))
             messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_save"))
         except Exception as e:
             messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_save").format(error=e))
