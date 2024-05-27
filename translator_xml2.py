@@ -52,6 +52,7 @@ class XMLProjectManager:
     def __init__(self):
         self.proyecto_id = None
         self.db_path = None
+        self.language = "Idioma original"  # Valor predeterminado
 
     def crear_proyecto(self, nombre_proyecto):
         # Crear carpeta y base de datos
@@ -108,15 +109,18 @@ class XMLProjectManager:
             etiqueta_principal TEXT,
             variable TEXT,
             texto TEXT,
+            language TEXT,
             FOREIGN KEY (proyecto_id) REFERENCES Proyectos(id)
         )""")
         conn.commit()
         conn.close()
 
     def cargar_xml(self, archivo_xml):
+        global db_modified
         parser_with_comments = ET.XMLParser(remove_blank_text=False, strip_cdata=False, ns_clean=False, recover=True, encoding='utf-8')
         tree = ET.parse(archivo_xml, parser=parser_with_comments)
         root = tree.getroot()
+        self.language = root.get("language") or "Idioma original"  # Obtener el idioma del archivo original
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -132,10 +136,12 @@ class XMLProjectManager:
                     # Actualizar si el texto ha cambiado
                     if result[1] != elem.text:
                         cursor.execute("UPDATE Etiquetas SET texto=? WHERE id=?", (elem.text, result[0]))
+                        db_modified = True
                 else:
                     cursor.execute("""
-                    INSERT INTO Etiquetas (proyecto_id, etiqueta_principal, variable, texto)
-                    VALUES (?, ?, ?, ?)""", (self.proyecto_id, etiqueta_principal, variable, elem.text))
+                    INSERT INTO Etiquetas (proyecto_id, etiqueta_principal, variable, texto, language)
+                    VALUES (?, ?, ?, ?, ?)""", (self.proyecto_id, etiqueta_principal, variable, elem.text, self.language))
+                    db_modified = True
         
         conn.commit()
         conn.close()
@@ -144,7 +150,7 @@ class XMLProjectManager:
     def obtener_etiquetas(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, etiqueta_principal, variable, texto FROM Etiquetas WHERE proyecto_id=?", (self.proyecto_id,))
+        cursor.execute("SELECT id, etiqueta_principal, variable, texto, language FROM Etiquetas WHERE proyecto_id=?", (self.proyecto_id,))
         etiquetas = cursor.fetchall()
         conn.close()
         return etiquetas
@@ -173,6 +179,8 @@ def translate_text_id(text_id, **kwargs):
     except KeyError as e:
         print(f"Missing key in translations: {e}")
         return text
+    except AttributeError:
+        return text
 
 def translate_text():
     global db_modified, xml_modified
@@ -187,7 +195,7 @@ def translate_text():
     translator = GoogleTranslator(source='auto', target=target_lang)
     try:
         for etiqueta in etiquetas:
-            id, etiqueta_principal, variable, texto = etiqueta
+            id, etiqueta_principal, variable, texto, _ = etiqueta
             translated_text = translator.translate(texto)
             manager.actualizar_etiqueta(id, translated_text)
         db_modified = True
@@ -215,17 +223,21 @@ def save_xml():
                 root.set("translatedname", VALID_LANGUAGES[output_language_var.get()])
 
                 for etiqueta in etiquetas:
-                    _, etiqueta_principal, variable, texto = etiqueta
+                    _, etiqueta_principal, variable, texto, _ = etiqueta
                     tag = f"{etiqueta_principal}.{variable}" if variable else etiqueta_principal
                     elem = root.find(f".//{tag}")
                     if elem is not None:
                         elem.text = texto
-                    else:
-                        new_elem = ET.SubElement(root, tag)
-                        new_elem.text = texto
 
-            with open(file_path, 'wb') as f:
-                f.write(ET.tostring(root, encoding='utf-8', xml_declaration=True, pretty_print=True))
+                tree = ET.ElementTree(root)
+                with open(file_path, 'wb') as f:
+                    f.write(codecs.BOM_UTF8)
+                    tree.write(f, encoding='utf-8', xml_declaration=True, pretty_print=True)
+                xml_modified = False
+            else:
+                with open(file_path, 'wb') as f:
+                    f.write(codecs.BOM_UTF8)
+                    tree.write(f, encoding='utf-8', xml_declaration=True, pretty_print=True)
             messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_save"))
         except Exception as e:
             messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_save").format(error=e))
@@ -233,7 +245,7 @@ def save_xml():
 def save_database():
     global db_modified
     if db_modified:
-        messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_save"))
+        messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_save_db"))
         db_modified = False
     else:
         messagebox.showinfo(translate_text_id("window_title"), translate_text_id("No changes to save"))
@@ -255,17 +267,24 @@ def visualizar_base_datos():
     # Crear una nueva ventana para mostrar la base de datos
     db_window = tk.Toplevel(app)
     db_window.title(translate_text_id("view_db_title"))
-    db_window.geometry("600x400")
+    db_window.geometry("800x600")
 
-    treeview = ttk.Treeview(db_window, columns=("etiqueta_principal", "variable", "texto"), show='headings')
+    treeview = ttk.Treeview(db_window, columns=("etiqueta_principal", "variable", manager.language), show='headings')
     treeview.heading("etiqueta_principal", text=translate_text_id("Etiqueta Principal"))
     treeview.heading("variable", text=translate_text_id("Variable"))
-    treeview.heading("texto", text=translate_text_id("Texto"))
-    
+    treeview.heading(manager.language, text=manager.language)
+
+    # Añadir scrollbars
+    vsb = ttk.Scrollbar(db_window, orient="vertical", command=treeview.yview)
+    hsb = ttk.Scrollbar(db_window, orient="horizontal", command=treeview.xview)
+    treeview.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+
+    vsb.pack(side="right", fill="y")
+    hsb.pack(side="bottom", fill="x")
+    treeview.pack(fill=tk.BOTH, expand=True)
+
     for etiqueta in etiquetas:
         treeview.insert("", "end", values=(etiqueta[1], etiqueta[2], etiqueta[3]))
-
-    treeview.pack(fill=tk.BOTH, expand=True)
 
 def cargar_y_procesar_xml():
     global tree, root, xml_modified
