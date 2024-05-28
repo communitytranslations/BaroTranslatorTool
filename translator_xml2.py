@@ -5,6 +5,8 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from deep_translator import GoogleTranslator
 from lxml import etree as ET
 import codecs
+import shutil
+import tempfile
 
 # Parser para XML
 parser = ET.XMLParser(remove_blank_text=True)
@@ -12,9 +14,10 @@ tree = None
 root = None
 translations = {}
 db_modified = False
-xml_modified = False  # Para verificar si se ha realizado una traducción
+xml_modified = False
+temp_db_path = None
+base_temp = True
 
-# Diccionarios de lenguajes válidos y soporte para Google Translator
 VALID_LANGUAGES = {
     "Brazilian Portuguese": "Português brasileiro",
     "Castilian Spanish": "Castellano",
@@ -47,20 +50,22 @@ GOOGLE_TRANSLATE_LANGUAGES = {
     "Turkish": "tr"
 }
 
-# Clase para gestión de proyectos
 class XMLProjectManager:
     def __init__(self):
         self.proyecto_id = None
         self.db_path = None
-        self.language = "Idioma original"  # Valor predeterminado
+        self.language = "Idioma original"
+        self.project_name = ""
 
     def crear_proyecto(self, nombre_proyecto):
-        # Crear carpeta y base de datos
+        global temp_db_path, base_temp
         os.makedirs(nombre_proyecto, exist_ok=True)
         self.db_path = os.path.join(nombre_proyecto, 'proyecto.db')
         self._crear_base_datos()
-
-        # Insertar el nuevo proyecto en la tabla Proyectos
+        self.project_name = nombre_proyecto
+        base_temp = False
+        temp_db_path = os.path.join(tempfile.gettempdir(), 'temp_proyecto.db')
+        shutil.copy(self.db_path, temp_db_path)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("INSERT INTO Proyectos (nombre, ruta_carpeta) VALUES (?, ?)", (nombre_proyecto, nombre_proyecto))
@@ -69,28 +74,28 @@ class XMLProjectManager:
         conn.close()
 
     def abrir_proyecto(self, db_path):
-        # Abrir base de datos existente
+        global temp_db_path, base_temp
         self.db_path = db_path
+        self.project_name = os.path.basename(os.path.dirname(db_path))
         if not os.path.exists(self.db_path):
-            messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_load").format(error="La base de datos no existe en la ruta seleccionada."))
+            messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_load").format(error=translate_text_id("db_path_error")))
             return
-
-        # Comprobar existencia de tablas
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Proyectos'")
         if not cursor.fetchone():
-            messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_load").format(error="La base de datos no contiene las tablas necesarias."))
+            messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_load").format(error=translate_text_id("db_table_error")))
             conn.close()
             return
-        
-        # Obtener ID del proyecto
         cursor.execute("SELECT id FROM Proyectos")
         proyecto = cursor.fetchone()
         if proyecto is None:
-            messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_load").format(error="No se encontró el proyecto en la base de datos."))
+            messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_load").format(error=translate_text_id("db_project_error")))
         else:
             self.proyecto_id = proyecto[0]
+        temp_db_path = os.path.join(tempfile.gettempdir(), 'temp_proyecto.db')
+        shutil.copy(self.db_path, temp_db_path)
+        base_temp = False
         conn.close()
 
     def _crear_base_datos(self):
@@ -116,16 +121,22 @@ class XMLProjectManager:
         conn.close()
 
     def cargar_xml(self, archivo_xml):
-        global db_modified
+        global db_modified, temp_db_path, base_temp, tree, root
+        if base_temp and not temp_db_path:
+            temp_db_path = os.path.join(tempfile.gettempdir(), 'temp_proyecto.db')
+            self.db_path = temp_db_path
+            self._crear_base_datos()
+            self.proyecto_id = 1
+            base_temp = True
         parser_with_comments = ET.XMLParser(remove_blank_text=False, strip_cdata=False, ns_clean=False, recover=True, encoding='utf-8')
-        tree = ET.parse(archivo_xml, parser=parser_with_comments)
+        tree = ET.parse(archivo_xml, parser_with_comments)
         root = tree.getroot()
-        self.language = root.get("language") or "Idioma original"  # Obtener el idioma del archivo original
-        conn = sqlite3.connect(self.db_path)
+        self.language = root.get("language") or "Idioma original"
+        conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
 
         for elem in root.iter():
-            if isinstance(elem.tag, str):  # Asegurarse de que elem.tag es una cadena
+            if isinstance(elem.tag, str):
                 tag_parts = elem.tag.split('.')
                 etiqueta_principal = tag_parts[0]
                 variable = tag_parts[1] if len(tag_parts) > 1 else ''
@@ -133,7 +144,6 @@ class XMLProjectManager:
                                (self.proyecto_id, etiqueta_principal, variable))
                 result = cursor.fetchone()
                 if result:
-                    # Actualizar si el texto ha cambiado
                     if result[1] != elem.text:
                         cursor.execute("UPDATE Etiquetas SET texto=? WHERE id=?", (elem.text, result[0]))
                         db_modified = True
@@ -148,7 +158,9 @@ class XMLProjectManager:
         return tree, root
 
     def obtener_etiquetas(self):
-        conn = sqlite3.connect(self.db_path)
+        if not temp_db_path:
+            raise ValueError("No se ha cargado una base de datos o archivo XML")
+        conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT id, etiqueta_principal, variable, texto, language FROM Etiquetas WHERE proyecto_id=?", (self.proyecto_id,))
         etiquetas = cursor.fetchall()
@@ -156,7 +168,7 @@ class XMLProjectManager:
         return etiquetas
 
     def actualizar_etiqueta(self, id, texto_traducido):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
         cursor.execute("UPDATE Etiquetas SET texto=? WHERE id=?", (texto_traducido, id))
         conn.commit()
@@ -198,20 +210,16 @@ def translate_text():
             id, etiqueta_principal, variable, texto, _ = etiqueta
             translated_text = translator.translate(texto)
             manager.actualizar_etiqueta(id, translated_text)
-        db_modified = True
         xml_modified = True
+        db_modified = True
         messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_translate"))
     except Exception as e:
         messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_translate").format(error=e))
 
 def save_xml():
-    global xml_modified, tree, root
-    if not manager.proyecto_id:
+    global xml_modified, root
+    if not root:
         messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_no_file"))
-        return
-
-    if root is None:
-        messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_save").format(error="No XML file loaded."))
         return
 
     file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml")])
@@ -219,13 +227,10 @@ def save_xml():
         try:
             if xml_modified:
                 etiquetas = manager.obtener_etiquetas()
-                root.set("language", output_language_var.get())
-                root.set("translatedname", VALID_LANGUAGES[output_language_var.get()])
-
                 for etiqueta in etiquetas:
                     _, etiqueta_principal, variable, texto, _ = etiqueta
                     tag = f"{etiqueta_principal}.{variable}" if variable else etiqueta_principal
-                    elem = root.find(f".//{tag}")
+                    elem = root.find(tag)
                     if elem is not None:
                         elem.text = texto
 
@@ -243,18 +248,30 @@ def save_xml():
             messagebox.showerror(translate_text_id("window_title"), translate_text_id("error_save").format(error=e))
 
 def save_database():
-    global db_modified
+    global db_modified, temp_db_path, base_temp
     if db_modified:
+        if base_temp:
+            nombre_proyecto = simpledialog.askstring(translate_text_id("window_title"), translate_text_id("project_name_input"))
+            if nombre_proyecto:
+                manager.crear_proyecto(nombre_proyecto)
+        shutil.copy(temp_db_path, manager.db_path)
         messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_save_db"))
         db_modified = False
+        base_temp = False
     else:
-        messagebox.showinfo(translate_text_id("window_title"), translate_text_id("No changes to save"))
+        messagebox.showinfo(translate_text_id("window_title"), translate_text_id("no_changes"))
 
 def on_closing():
+    global temp_db_path
     if db_modified:
-        if messagebox.askokcancel(translate_text_id("window_title"), translate_text_id("desea salir sin guardar base de datos?")):
+        if messagebox.askokcancel(translate_text_id("window_title"), translate_text_id("ask_db_save")):
+            save_database()
+            if temp_db_path and os.path.exists(temp_db_path):
+                os.remove(temp_db_path)
             app.destroy()
     else:
+        if temp_db_path and os.path.exists(temp_db_path):
+            os.remove(temp_db_path)
         app.destroy()
 
 def visualizar_base_datos():
@@ -263,18 +280,15 @@ def visualizar_base_datos():
         return
 
     etiquetas = manager.obtener_etiquetas()
-
-    # Crear una nueva ventana para mostrar la base de datos
     db_window = tk.Toplevel(app)
-    db_window.title(translate_text_id("view_db_title"))
+    db_window.title(manager.project_name)
     db_window.geometry("800x600")
 
     treeview = ttk.Treeview(db_window, columns=("etiqueta_principal", "variable", manager.language), show='headings')
-    treeview.heading("etiqueta_principal", text=translate_text_id("Etiqueta Principal"))
-    treeview.heading("variable", text=translate_text_id("Variable"))
+    treeview.heading("etiqueta_principal", text=translate_text_id("flag_main"))
+    treeview.heading("variable", text=translate_text_id("flag_var"))
     treeview.heading(manager.language, text=manager.language)
 
-    # Añadir scrollbars
     vsb = ttk.Scrollbar(db_window, orient="vertical", command=treeview.yview)
     hsb = ttk.Scrollbar(db_window, orient="horizontal", command=treeview.xview)
     treeview.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -292,34 +306,50 @@ def cargar_y_procesar_xml():
     if archivo_xml:
         tree, root = manager.cargar_xml(archivo_xml)
         xml_modified = False
+        messagebox.showinfo(translate_text_id("window_title"), translate_text_id("success_load"))
+
+def crear_nuevo_proyecto():
+    global db_modified, base_temp, temp_db_path
+    if db_modified:
+        if messagebox.askyesno(translate_text_id("window_title"), translate_text_id("ask_db_save")):
+            save_database()
+    nombre_proyecto = simpledialog.askstring(translate_text_id("ask_project_name"), translate_text_id("project_name_input"))
+    if nombre_proyecto:
+        manager.crear_proyecto(nombre_proyecto)
+        base_temp = False
+    if temp_db_path and os.path.exists(temp_db_path):
+        os.remove(temp_db_path)
+        temp_db_path = None
+
+def abrir_proyecto():
+    global db_modified, base_temp, temp_db_path
+    if db_modified:
+        if messagebox.askyesno(translate_text_id("window_title"), translate_text_id("ask_db_save")):
+            save_database()
+    db_path = filedialog.askopenfilename(title=translate_text_id("db_select"), filetypes=[("Database files", "*.db")])
+    if db_path:
+        manager.abrir_proyecto(db_path)
+        base_temp = False
+    if temp_db_path and os.path.exists(temp_db_path):
+        os.remove(temp_db_path)
+        temp_db_path = None
 
 def main():
-    global manager, output_language_var, app
+    global manager, output_language_var, app, temp_db_path
     manager = XMLProjectManager()
 
     app = tk.Tk()
-    app.withdraw()  # Ocultar ventana principal
+    app.withdraw()
 
-    # Diálogo inicial
-    respuesta = messagebox.askquestion(translate_text_id("window_title"), translate_text_id("¿Qué deseas hacer?"), icon='question', type='yesnocancel', default='yes', 
-                                       detail=translate_text_id("Yes: Crear nuevo proyecto\nNo: Abrir proyecto existente"))
-    if respuesta == 'yes':
-        nombre_proyecto = simpledialog.askstring(translate_text_id("Nombre del proyecto"), translate_text_id("Introduce el nombre del nuevo proyecto:"))
-        if nombre_proyecto:
-            manager.crear_proyecto(nombre_proyecto)
-        else:
-            app.destroy()
-            return
-    elif respuesta == 'no':
-        db_path = filedialog.askopenfilename(title=translate_text_id("Selecciona la base de datos del proyecto"), filetypes=[("Database files", "*.db")])
-        if db_path:
-            manager.abrir_proyecto(db_path)
-        else:
-            app.destroy()
-            return
-    else:
-        app.destroy()
-        return
+    menubar = tk.Menu(app)
+    app.config(menu=menubar)
+
+    file_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label=translate_text_id("menu_file"), menu=file_menu)
+    file_menu.add_command(label=translate_text_id("menu_new_project"), command=crear_nuevo_proyecto)
+    file_menu.add_command(label=translate_text_id("menu_open_project"), command=abrir_proyecto)
+    file_menu.add_separator()
+    file_menu.add_command(label=translate_text_id("menu_close"), command=on_closing)
 
     app.deiconify()
     app.title(translate_text_id("window_title"))
@@ -345,9 +375,8 @@ def main():
     view_db_button = tk.Button(frame, text=translate_text_id("view_db_button"), command=visualizar_base_datos)
     view_db_button.grid(row=2, column=0, columnspan=3, pady=10)
 
-    # Selección de idioma de salida
     output_language_var = tk.StringVar(app)
-    output_language_var.set("Castilian Spanish")  # Valor por defecto
+    output_language_var.set("Castilian Spanish")
 
     output_language_label = tk.Label(frame, text=translate_text_id("output_language_label"))
     output_language_label.grid(row=3, column=0, padx=10, pady=10)
