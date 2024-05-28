@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <translations>
-    <text id="title">Traductor XML</text>
+    <text id="window_title">Traductor XML</text>
     <text id="load_button">Cargar XML</text>
     <text id="translate_button">Traducir</text>
     <text id="save_button">Guardar XML</text>
+    <text id="view_db_button">Ver Base de Datos</text>
+    <text id="save_db_button">Guardar Base de Datos</text>
     <text id="success_load">Archivo XML cargado correctamente.</text>
     <text id="error_load">No se pudo cargar el archivo XML: {error}</text>
     <text id="success_save">Archivo XML guardado correctamente.</text>
@@ -14,8 +16,25 @@
     <text id="error_translate">No se pudo completar la traducción: {error}</text>
     <text id="error_invalid_structure">El archivo XML debe comenzar con la etiqueta &lt;infotexts&gt;.</text>
     <text id="error_invalid_language">El valor de 'language' no es válido: {language}.</text>
-    <text id="error_invalid_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}' Pone: {translatedname}.</text>
-    <text id="change_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}'. Pone:  {translatedname}. ¿Quieres cambiarlo a '{correct_translatedname}'?</text>
+    <text id="error_invalid_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.</text>
+    <text id="change_translatedname">El valor de 'translatedname' no es válido para el idioma '{language}': {translatedname}.\n¿Quieres cambiarlo a '{correct_translatedname}'?</text>
     <text id="info_translatedname_changed">El valor de 'translatedname' ha sido cambiado a '{correct_translatedname}'.</text>
-    <text id="output_language_label">Idioma de salida:</text>
+    <text id="output_language_label">Idioma de salida</text>
+    <text id="view_db_title">Base de Datos</text>
+    <text id="Introduce el nombre del nuevo proyecto:">Introduce el nombre del nuevo proyecto:</text>
+    <text id="ask_project_name">Nombre del proyecto</text>
+    <text id="db_select">Selecciona la base de datos del proyecto</text>
+    <text id="flag_main">Etiqueta Principal</text>
+    <text id="flag_var">Variable</text>
+    <text id="success_save_db">Base de datos guardada correctamente</text>
+    <text id="db_path_error">La base de datos no existe en la ruta seleccionada.</text>
+    <text id="db_table_error">La base de datos no contiene las tablas necesarias.</text>
+    <text id="db_project_error">No se encontró el proyecto en la base de datos.</text>
+    <text id="project_name_input">Introduce el nombre del nuevo proyecto:</text>
+    <text id="no_changes">No hay cambios que guardar</text>
+    <text id="ask_db_save">¿Desea salir sin guardar base de datos?</text>
+    <text id="menu_file">Archivo</text>
+    <text id="menu_new_project">Crear Nuevo Proyecto</text>
+    <text id="menu_open_project">Abrir Proyecto</text>
+    <text id="menu_close">Cerrar</text>
 </translations>
